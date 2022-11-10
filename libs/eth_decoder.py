@@ -1,4 +1,5 @@
 import json
+import os
 import traceback
 
 from web3 import Web3
@@ -13,6 +14,8 @@ def main():
                         help='Chain ID, Default: 1 (Ethereum Mainnet)')
     parser.add_argument('--abi', default=None,
                         help='ABI in JSON format. If not provided it will be obtained from Etherscan if available')
+    parser.add_argument('--provider',
+                        help='Web3 HTTP Provider')
     parser.add_argument('--api_key', default='',
                         help='Blockchain Explorer API Key. If not provided ratelimit to 1req/5s')
 
@@ -38,7 +41,9 @@ def main():
     args = parser.parse_args()
     try:
         if args.command == 'decode_function_input':
-            w3 = Web3()
+            if args.provider is None or args.provider == '':
+                args.provider = os.getenv('WEB3_PROVIDER_URI')
+            w3 = Web3(Web3.HTTPProvider(args.provider))
             etherscan_api = EtherscanAPI(chain_id=args.chain, api_key=args.api_key)
             decoder = EthereumDecoder(w3=w3, etherscan_api=etherscan_api)
             decoded_fun = decoder.decode_full_function(contract_address=Web3.toChecksumAddress(args.address),
@@ -54,7 +59,9 @@ def main():
             print(json.dumps(prepare_for_json(decode_list_abi(types, args.data)), indent=2))
 
         elif args.command == 'decode_raw_transaction':
-            w3 = Web3()
+            if args.provider is None or args.provider == '':
+                args.provider = os.getenv('WEB3_PROVIDER_URI')
+            w3 = Web3(Web3.HTTPProvider(args.provider))
             etherscan_api = EtherscanAPI(chain_id=args.chain, api_key=args.api_key)
             decoder = EthereumDecoder(w3=w3, etherscan_api=etherscan_api)
             decoded_fun = decoder.decode_full_raw_transaction(raw_tx=args.raw, abi=args.abi)

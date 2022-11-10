@@ -52,6 +52,7 @@ def get_eth_decoder_location():
     except:
         pass
 
+
     # 3. If virtualenv does not work, check with precompiled binaries
     DIST_LOCATION = os.path.join(os.getcwd(), 'libs', 'dist')
     system = System.getProperty('os.name')
@@ -295,7 +296,8 @@ class EthJSONRPCInputTab(IMessageEditorTab):
                     if json_body['method'] == 'eth_call':
                         params = [i for i in json_body['params'] if isinstance(i, dict)]
                         chain_id = self._get_chain_id(request_info)
-                        decoded_tx_json = self.decode_tx_input(chain_id, params[0]['to'], params[0]['data'])
+                        provider = self._get_provider_url(request_info)
+                        decoded_tx_json = self.decode_tx_input(chain_id, params[0]['to'], params[0]['data'], provider)
                         self._txtInput.setText(self._extender._helpers.stringToBytes(decoded_tx_json))
 
                         # Save the output type from the ABI to use it later when decoding the result
@@ -324,7 +326,8 @@ class EthJSONRPCInputTab(IMessageEditorTab):
                         decoded_tx_list = []
                         for raw_tx in json_body['params']:
                             chain_id = self._get_chain_id(request_info)
-                            decoded_raw_tx_json = self.decode_raw_tx(chain_id, raw_tx)
+                            provider = self._get_provider_url(request_info)
+                            decoded_raw_tx_json = self.decode_raw_tx(chain_id, raw_tx, provider)
                             decoded_raw_tx = json.loads(decoded_raw_tx_json, strict=False)
                             decoded_tx_list.append(decoded_raw_tx)
 
@@ -408,7 +411,23 @@ class EthJSONRPCInputTab(IMessageEditorTab):
     def getSelectedData(self):
         return self._txtInput.getSelectedText()
 
+    def _get_provider_url(self, request_info):
+        headers = request_info.getHeaders()
+        host_header = [h for h in headers if h.startswith('Host:') or h.startswith('host:')][0]
+        host = host_header.split(':', 1)[1].strip()
+        if ':' in host:
+            port = int(host.split(':')[1])
+            is_https = str(port).endswith('443')
+        else:
+            port = 443
+            is_https = True
+        proto = 'https' if is_https else 'http'
+        path = headers[0].split(' ')[1]
+        url = '%s://%s:%s%s' % (proto, host, port, path)
+        return url
+
     def _get_chain_id(self, request_info):
+        self._get_provider_url(request_info)
         headers = request_info.getHeaders()
         host_header = [h for h in headers if h.startswith('Host:') or h.startswith('host:')][0]
         host = host_header.split(':', 1)[1].strip()
@@ -482,9 +501,9 @@ class EthJSONRPCInputTab(IMessageEditorTab):
                 logger.error(traceback.format_exc())
                 return '1'
 
-    def decode_tx_input(self, chain_id, address, data):
+    def decode_tx_input(self, chain_id, address, data, provider):
         try:
-            return check_output(DECODER_COMMAND_L + ['--chain', chain_id, 'decode_function_input', address, data])
+            return check_output(DECODER_COMMAND_L + ['--chain', chain_id, '--provider', provider, 'decode_function_input', address, data])
         except Exception:
             logger.error(traceback.format_exc())
             return None
@@ -504,9 +523,9 @@ class EthJSONRPCInputTab(IMessageEditorTab):
             logger.error(traceback.format_exc())
             return None
 
-    def decode_raw_tx(self, chain_id, raw_tx):
+    def decode_raw_tx(self, chain_id, raw_tx, provider):
         try:
-            return check_output(DECODER_COMMAND_L + ['--chain', chain_id, 'decode_raw_transaction', raw_tx])
+            return check_output(DECODER_COMMAND_L + ['--chain', chain_id, '--provider', provider, 'decode_raw_transaction', raw_tx])
         except Exception:
             logger.error(traceback.format_exc())
             return None
