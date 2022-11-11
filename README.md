@@ -97,6 +97,8 @@ If you want to add more blockchain explorers, add them to the [chains.json](chai
 
 ## Examples
 
+For more examples, including proxy and multicall calls, see the [EXAMPLES.md](docs/EXAMPLES.md)
+
 **eth_call**:
 
 Raw:
